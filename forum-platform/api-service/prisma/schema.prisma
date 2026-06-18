@@ -385,14 +385,20 @@ model CourseProgress {
 }
 
 model Group {
-  id          String          @id @default(cuid())
-  name        String          @unique
-  description String?
-  slug        String          @unique
-  icon        String?
-  isPrivate   Boolean         @default(false)
-  createdAt   DateTime        @default(now())
-  members     GroupMember[]
+  id               String          @id @default(cuid())
+  name             String          @unique
+  description      String?
+  slug             String          @unique
+  icon             String?
+  coverImage       String?
+  isPrivate        Boolean         @default(false)
+  requiresApproval Boolean         @default(false)
+  ownerId          String
+  topics           Topic[]
+  members          GroupMember[]
+  moderators       GroupModerator[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
   @@index([slug])
 }
@@ -402,10 +408,22 @@ model GroupMember {
   groupId   String     @map("group_id")
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   group     Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  role      GroupRole  @default(MEMBER)
+  role      GroupRole @default(MEMBER)
+  status    MemberStatus @default(APPROVED)
   joinedAt  DateTime   @default(now())
 
   @@id([userId, groupId])
+}
+
+model GroupModerator {
+  id        String   @id @default(cuid())
+  groupId   String
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@unique([groupId, userId])
+  @@index([groupId])
 }
 
 enum GroupRole {
@@ -759,4 +777,80 @@ model SitemapEntry {
 
   @@index([type])
   @@index([updatedAt])
+}
+
+// ============ 反应/表情系统 (Reactions) ============
+model Reaction {
+  id          String   @id @default(cuid())
+  userId      String
+  targetType  String   // 'topic' | 'post'
+  targetId    String
+  reactionType String  // 'like' | 'love' | 'laugh' | 'wow' | 'sad' | 'angry'
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, targetType, targetId])
+  @@index([userId])
+  @@index([targetType, targetId])
+}
+
+// ============ 附件系统 (Attachments) ============
+model Attachment {
+  id               String   @id @default(cuid())
+  filename         String
+  storedFilename   String
+  mimeType         String
+  size             Int
+  thumbnailFilename String?
+  userId           String
+  topicId         String?
+  postId          String?
+  messageId       String?
+  createdAt        DateTime @default(now())
+
+  @@index([userId])
+  @@index([topicId])
+  @@index([postId])
+}
+
+// ============ 用户动态 (Activity) ============
+model Activity {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  type        String   // 'TOPIC_CREATED' | 'REPLY_CREATED' | 'FOLLOWED_USER' | 'BADGE_EARNED' | etc.
+  targetType  String?  // 'topic' | 'user' | 'badge' | 'group'
+  targetId    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([targetType, targetId])
+}
+
+// ============ 通知系统 (Notifications) ============
+model Notification {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  type        String
+  title       String
+  message     String
+  isRead      Boolean   @default(false)
+  data        Json?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+// ============ 角色权限关联 (Role Permissions) ============
+model RolePermission {
+  id          String @id @default(cuid())
+  roleId      String
+  role        Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission  String
+
+  @@unique([roleId, permission])
+  @@index([roleId])
 }
