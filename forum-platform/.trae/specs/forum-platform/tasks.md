@@ -40,8 +40,9 @@
 - **Priority**: P0
 - **Depends On**: Task 3
 - **Description**: 
-  - 初始化NestJS项目
+  - 初始化NestJS 12项目（ESM模式）
   - 配置Prisma模块、Redis模块
+  - 配置Vitest测试框架和oxlint代码检查
   - 实现基础API响应格式和错误处理
 - **Acceptance Criteria Addressed**: FR-1, FR-2
 - **Test Requirements**:
@@ -188,9 +189,10 @@
 - **Priority**: P0
 - **Depends On**: Task 4
 - **Description**: 
-  - 初始化Next.js 14项目（App Router）
+  - 初始化Next.js 16.2项目（App Router + Turbopack）
   - 配置shadcn/ui组件库
-  - 配置TailwindCSS 3
+  - 配置TailwindCSS 4（使用Oxide引擎）
+  - 配置Vitest测试框架和oxlint代码检查
 - **Acceptance Criteria Addressed**: NFR-4, AC-9
 - **Test Requirements**:
   - `programmatic` TR-16.1: 前端项目构建成功
