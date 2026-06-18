@@ -1,0 +1,429 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String              @id @default(cuid())
+  email              String              @unique
+  username           String              @unique
+  password           String
+  displayName        String?
+  avatarUrl          String?
+  bio                String?
+  location           String?
+  website            String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  lastLoginAt        DateTime?
+  isActive           Boolean             @default(true)
+  isAdmin            Boolean             @default(false)
+  roles              Role[]              @relation("UserRoles")
+  permissions        Permission[]        @relation("UserPermissions")
+  topics             Topic[]
+  posts              Post[]
+  notifications      Notification[]      @relation("UserNotifications")
+  badges             UserBadge[]
+  reputation         Reputation[]
+  reports            Report[]            @relation("Reporter")
+  reportedPosts      Report[]            @relation("ReportedContent")
+  blogPosts          BlogPost[]
+  courseProgress     CourseProgress[]
+  groups             GroupMember[]
+  rsvps              EventRSVP[]
+  profileViews       Int                 @default(0)
+
+  @@index([createdAt])
+  @@index([username])
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  users       User[]   @relation("UserRoles")
+  permissions Permission[]
+
+  @@index([name])
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  users       User[]   @relation("UserPermissions")
+  roles       Role[]
+
+  @@index([name])
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  slug        String    @unique
+  parentId    String?
+  parent      Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryHierarchy")
+  topics      Topic[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  icon        String?
+
+  @@index([slug])
+  @@index([parentId])
+}
+
+model Topic {
+  id           String      @id @default(cuid())
+  title        String
+  content      String
+  categoryId   String
+  category     Category    @relation(fields: [categoryId], references: [id])
+  authorId     String
+  author       User        @relation(fields: [authorId], references: [id])
+  posts        Post[]
+  tags         TopicTag[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  isLocked     Boolean     @default(false)
+  isPinned     Boolean     @default(false)
+  viewCount    Int         @default(0)
+  replyCount   Int         @default(0)
+  lastReplyAt  DateTime?
+  status       TopicStatus @default(PENDING)
+
+  @@index([categoryId])
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+enum TopicStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Post {
+  id           String     @id @default(cuid())
+  content      String
+  topicId      String
+  topic        Topic      @relation(fields: [topicId], references: [id])
+  authorId     String
+  author       User       @relation(fields: [authorId], references: [id])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  parentId     String?
+  parent       Post?      @relation("PostReplies", fields: [parentId], references: [id])
+  replies      Post[]     @relation("PostReplies")
+  isApproved   Boolean    @default(true)
+  likes        Int        @default(0)
+
+  @@index([topicId])
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+model Tag {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  color       String    @default("#007bff")
+  topics      TopicTag[]
+  createdAt   DateTime  @default(now())
+
+  @@index([name])
+}
+
+model TopicTag {
+  topicId  String @map("topic_id")
+  tagId    String @map("tag_id")
+  topic    Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([topicId, tagId])
+}
+
+model Notification {
+  id          String              @id @default(cuid())
+  userId      String
+  user        User                @relation("UserNotifications", fields: [userId], references: [id])
+  type        NotificationType
+  title       String
+  message     String
+  link        String?
+  readAt      DateTime?
+  createdAt   DateTime            @default(now())
+  metadata    Json?
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  NEW_TOPIC
+  NEW_REPLY
+  TOPIC_TAGGED
+  MENTION
+  BADGE_EARNED
+  REPUTATION_CHANGE
+  SYSTEM
+}
+
+model Media {
+  id          String    @id @default(cuid())
+  filename    String
+  originalName String
+  mimeType    String
+  size        Int
+  url         String
+  thumbnailUrl String?
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  albumId     String?
+  album       Album?    @relation(fields: [albumId], references: [id])
+  createdAt   DateTime  @default(now())
+  isPublic    Boolean   @default(true)
+
+  @@index([userId])
+}
+
+model Album {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  userId      String
+  user        User    @relation(fields: [userId], references: [id])
+  media       Media[]
+  createdAt   DateTime @default(now())
+  isPublic    Boolean  @default(false)
+
+  @@index([userId])
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  title       String
+  description String
+  date        DateTime
+  endDate     DateTime?
+  location    String?
+  venue       String?
+  rsvps       EventRSVP[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  maxCapacity Int?
+  isPublic    Boolean   @default(true)
+
+  @@index([date])
+}
+
+model EventRSVP {
+  id          String    @id @default(cuid())
+  eventId     String
+  event       Event     @relation(fields: [eventId], references: [id])
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  status      RSVPStatus @default(PENDING)
+  createdAt   DateTime  @default(now())
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+}
+
+enum RSVPStatus {
+  PENDING
+  ATTENDING
+  DECLINED
+  WAITLIST
+}
+
+model Badge {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  icon        String
+  color       String    @default("#ffc107")
+  users       UserBadge[]
+  createdAt   DateTime  @default(now())
+
+  @@index([name])
+}
+
+model UserBadge {
+  userId    String   @map("user_id")
+  badgeId   String   @map("badge_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  earnedAt  DateTime @default(now())
+
+  @@id([userId, badgeId])
+}
+
+model Reputation {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  amount      Int
+  reason      String
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Report {
+  id              String            @id @default(cuid())
+  reporterId      String
+  reporter        User              @relation("Reporter", fields: [reporterId], references: [id])
+  postId          String?
+  post            Post?             @relation("ReportedContent", fields: [postId], references: [id])
+  reason          String
+  description     String?
+  createdAt       DateTime          @default(now())
+  status          ReportStatus      @default(PENDING)
+  reviewedBy      String?
+  reviewedAt      DateTime?
+
+  @@index([reporterId])
+  @@index([status])
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
+model ModerationAction {
+  id              String            @id @default(cuid())
+  moderatorId     String
+  moderator       User              @relation(fields: [moderatorId], references: [id])
+  actionType      ModerationActionType
+  targetType      String
+  targetId        String
+  reason          String?
+  createdAt       DateTime          @default(now())
+
+  @@index([moderatorId])
+}
+
+enum ModerationActionType {
+  APPROVE
+  REJECT
+  DELETE
+  WARN
+  BAN
+  UNBAN
+}
+
+model BlogPost {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  content     String
+  excerpt     String?
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id])
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id])
+  tags        Tag[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  isPublished Boolean   @default(false)
+  viewCount   Int       @default(0)
+  commentCount Int      @default(0)
+
+  @@index([slug])
+  @@index([authorId])
+}
+
+model Course {
+  id          String    @id @default(cuid())
+  title       String
+  description String
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id])
+  lessons     Lesson[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  isPublished Boolean   @default(false)
+  price       Decimal?
+
+  @@index([authorId])
+}
+
+model Lesson {
+  id          String    @id @default(cuid())
+  title       String
+  content     String
+  courseId    String
+  course      Course    @relation(fields: [courseId], references: [id])
+  order       Int
+  createdAt   DateTime  @default(now())
+
+  @@index([courseId])
+}
+
+model CourseProgress {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  courseId    String
+  course      Course    @relation(fields: [courseId], references: [id])
+  progress    Int       @default(0)
+  completedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([userId, courseId])
+}
+
+model Group {
+  id          String          @id @default(cuid())
+  name        String          @unique
+  description String?
+  slug        String          @unique
+  icon        String?
+  isPrivate   Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  members     GroupMember[]
+
+  @@index([slug])
+}
+
+model GroupMember {
+  userId    String     @map("user_id")
+  groupId   String     @map("group_id")
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group     Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  role      GroupRole  @default(MEMBER)
+  joinedAt  DateTime   @default(now())
+
+  @@id([userId, groupId])
+}
+
+enum GroupRole {
+  OWNER
+  ADMIN
+  MODERATOR
+  MEMBER
+}
+
+model Analytics {
+  id              String    @id @default(cuid())
+  date            DateTime  @default(now())
+  dau             Int       @default(0)
+  mau             Int       @default(0)
+  newUsers        Int       @default(0)
+  topicsCreated   Int       @default(0)
+  postsCreated    Int       @default(0)
+  pageViews       Int       @default(0)
+
+  @@index([date])
+}
