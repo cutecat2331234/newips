@@ -43,7 +43,7 @@
 - **NFR-6**: 符合GDPR和CCPA隐私标准
 
 ## Constraints
-- **Technical**: Rust 1.78+, TypeScript 5.5+, Next.js 16.2+, NestJS 12+, PostgreSQL 16+, Redis 7.2+, RabbitMQ 3.13+
+- **Technical**: Rust 1.78+, TypeScript 5.5+, Next.js 16.2+, React 19+, NestJS 12+, PostgreSQL 16+, Redis 7.2+, RabbitMQ 3.13+
 - **Business**: 无预算限制，追求极致体验
 - **Dependencies**: GitHub Actions CI/CD, Turbopack (Next.js默认打包器), Vitest (测试框架), oxlint (代码检查)
 

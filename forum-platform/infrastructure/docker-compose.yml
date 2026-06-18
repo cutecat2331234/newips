@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16.3-alpine
+    container_name: forum-postgres
+    environment:
+      POSTGRES_DB: forum_db
+      POSTGRES_USER: forum_user
+      POSTGRES_PASSWORD: forum_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forum_user -d forum_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - forum-network
+
+  redis:
+    image: redis:7.2.5-alpine
+    container_name: forum-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - forum-network
+
+  rabbitmq:
+    image: rabbitmq:3.13.3-management-alpine
+    container_name: forum-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: forum_user
+      RABBITMQ_DEFAULT_PASS: forum_password
+      RABBITMQ_DEFAULT_VHOST: /forum
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - forum-network
+
+  elasticsearch:
+    image: elasticsearch:8.14.3
+    container_name: forum-elasticsearch
+    environment:
+      discovery.type: single-node
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+      xpack.security.enabled: "false"
+      xpack.security.enrollment.enabled: "false"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - forum-network
+
+  nginx:
+    image: nginx:1.27.0-alpine
+    container_name: forum-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/certs:/etc/nginx/certs
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - forum-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+
+networks:
+  forum-network:
+    driver: bridge
