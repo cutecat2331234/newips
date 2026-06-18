@@ -1,0 +1,23 @@
+[package]
+name = "forum-core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+[package[package]
+name = "forum-core"
+version = "0.1.0"
+edition[package]
+name = "forum-core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = { version = "0[package]
+name = "forum-core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = { version = "0.7", features = ["headers", "http2"] }
+tokio = { version =
