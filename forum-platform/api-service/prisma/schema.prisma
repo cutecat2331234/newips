@@ -1,0 +1,856 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String              @id @default(cuid())
+  email              String              @unique
+  username           String              @unique
+  password           String
+  displayName        String?
+  avatarUrl          String?
+  bio                String?
+  location           String?
+  website            String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  lastLoginAt        DateTime?
+  isActive           Boolean             @default(true)
+  isAdmin            Boolean             @default(false)
+  roles              Role[]              @relation("UserRoles")
+  permissions        Permission[]        @relation("UserPermissions")
+  topics             Topic[]
+  posts              Post[]
+  notifications      Notification[]      @relation("UserNotifications")
+  badges             UserBadge[]
+  reputation         Reputation[]
+  reports            Report[]            @relation("Reporter")
+  reportedPosts      Report[]            @relation("ReportedContent")
+  blogPosts          BlogPost[]
+  courseProgress     CourseProgress[]
+  groups             GroupMember[]
+  rsvps              EventRSVP[]
+  profileViews       Int                 @default(0)
+
+  @@index([createdAt])
+  @@index([username])
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  users       User[]   @relation("UserRoles")
+  permissions Permission[]
+
+  @@index([name])
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  users       User[]   @relation("UserPermissions")
+  roles       Role[]
+
+  @@index([name])
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  slug        String    @unique
+  parentId    String?
+  parent      Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryHierarchy")
+  topics      Topic[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  icon        String?
+
+  @@index([slug])
+  @@index([parentId])
+}
+
+model Topic {
+  id           String      @id @default(cuid())
+  title        String
+  content      String
+  categoryId   String
+  category     Category    @relation(fields: [categoryId], references: [id])
+  authorId     String
+  author       User        @relation(fields: [authorId], references: [id])
+  posts        Post[]
+  tags         TopicTag[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  isLocked     Boolean     @default(false)
+  isPinned     Boolean     @default(false)
+  viewCount    Int         @default(0)
+  replyCount   Int         @default(0)
+  lastReplyAt  DateTime?
+  status       TopicStatus @default(PENDING)
+
+  @@index([categoryId])
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+enum TopicStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Post {
+  id           String     @id @default(cuid())
+  content      String
+  topicId      String
+  topic        Topic      @relation(fields: [topicId], references: [id])
+  authorId     String
+  author       User       @relation(fields: [authorId], references: [id])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  parentId     String?
+  parent       Post?      @relation("PostReplies", fields: [parentId], references: [id])
+  replies      Post[]     @relation("PostReplies")
+  isApproved   Boolean    @default(true)
+  likes        Int        @default(0)
+
+  @@index([topicId])
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+model Tag {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  color       String    @default("#007bff")
+  topics      TopicTag[]
+  createdAt   DateTime  @default(now())
+
+  @@index([name])
+}
+
+model TopicTag {
+  topicId  String @map("topic_id")
+  tagId    String @map("tag_id")
+  topic    Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([topicId, tagId])
+}
+
+model Notification {
+  id          String              @id @default(cuid())
+  userId      String
+  user        User                @relation("UserNotifications", fields: [userId], references: [id])
+  type        NotificationType
+  title       String
+  message     String
+  link        String?
+  readAt      DateTime?
+  createdAt   DateTime            @default(now())
+  metadata    Json?
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  NEW_TOPIC
+  NEW_REPLY
+  TOPIC_TAGGED
+  MENTION
+  BADGE_EARNED
+  REPUTATION_CHANGE
+  SYSTEM
+}
+
+model Media {
+  id          String    @id @default(cuid())
+  filename    String
+  originalName String
+  mimeType    String
+  size        Int
+  url         String
+  thumbnailUrl String?
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  albumId     String?
+  album       Album?    @relation(fields: [albumId], references: [id])
+  createdAt   DateTime  @default(now())
+  isPublic    Boolean   @default(true)
+
+  @@index([userId])
+}
+
+model Album {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  userId      String
+  user        User    @relation(fields: [userId], references: [id])
+  media       Media[]
+  createdAt   DateTime @default(now())
+  isPublic    Boolean  @default(false)
+
+  @@index([userId])
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  title       String
+  description String
+  date        DateTime
+  endDate     DateTime?
+  location    String?
+  venue       String?
+  rsvps       EventRSVP[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  maxCapacity Int?
+  isPublic    Boolean   @default(true)
+
+  @@index([date])
+}
+
+model EventRSVP {
+  id          String    @id @default(cuid())
+  eventId     String
+  event       Event     @relation(fields: [eventId], references: [id])
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  status      RSVPStatus @default(PENDING)
+  createdAt   DateTime  @default(now())
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+}
+
+enum RSVPStatus {
+  PENDING
+  ATTENDING
+  DECLINED
+  WAITLIST
+}
+
+model Badge {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  icon        String
+  color       String    @default("#ffc107")
+  users       UserBadge[]
+  createdAt   DateTime  @default(now())
+
+  @@index([name])
+}
+
+model UserBadge {
+  userId    String   @map("user_id")
+  badgeId   String   @map("badge_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  earnedAt  DateTime @default(now())
+
+  @@id([userId, badgeId])
+}
+
+model Reputation {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  amount      Int
+  reason      String
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Report {
+  id              String            @id @default(cuid())
+  reporterId      String
+  reporter        User              @relation("Reporter", fields: [reporterId], references: [id])
+  postId          String?
+  post            Post?             @relation("ReportedContent", fields: [postId], references: [id])
+  reason          String
+  description     String?
+  createdAt       DateTime          @default(now())
+  status          ReportStatus      @default(PENDING)
+  reviewedBy      String?
+  reviewedAt      DateTime?
+
+  @@index([reporterId])
+  @@index([status])
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
+model ModerationAction {
+  id              String            @id @default(cuid())
+  moderatorId     String
+  moderator       User              @relation(fields: [moderatorId], references: [id])
+  actionType      ModerationActionType
+  targetType      String
+  targetId        String
+  reason          String?
+  createdAt       DateTime          @default(now())
+
+  @@index([moderatorId])
+}
+
+enum ModerationActionType {
+  APPROVE
+  REJECT
+  DELETE
+  WARN
+  BAN
+  UNBAN
+}
+
+model BlogPost {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  content     String
+  excerpt     String?
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id])
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id])
+  tags        Tag[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  isPublished Boolean   @default(false)
+  viewCount   Int       @default(0)
+  commentCount Int      @default(0)
+
+  @@index([slug])
+  @@index([authorId])
+}
+
+model Course {
+  id          String    @id @default(cuid())
+  title       String
+  description String
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id])
+  lessons     Lesson[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  isPublished Boolean   @default(false)
+  price       Decimal?
+
+  @@index([authorId])
+}
+
+model Lesson {
+  id          String    @id @default(cuid())
+  title       String
+  content     String
+  courseId    String
+  course      Course    @relation(fields: [courseId], references: [id])
+  order       Int
+  createdAt   DateTime  @default(now())
+
+  @@index([courseId])
+}
+
+model CourseProgress {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  courseId    String
+  course      Course    @relation(fields: [courseId], references: [id])
+  progress    Int       @default(0)
+  completedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([userId, courseId])
+}
+
+model Group {
+  id               String          @id @default(cuid())
+  name             String          @unique
+  description      String?
+  slug             String          @unique
+  icon             String?
+  coverImage       String?
+  isPrivate        Boolean         @default(false)
+  requiresApproval Boolean         @default(false)
+  ownerId          String
+  topics           Topic[]
+  members          GroupMember[]
+  moderators       GroupModerator[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([slug])
+}
+
+model GroupMember {
+  userId    String     @map("user_id")
+  groupId   String     @map("group_id")
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group     Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  role      GroupRole @default(MEMBER)
+  status    MemberStatus @default(APPROVED)
+  joinedAt  DateTime   @default(now())
+
+  @@id([userId, groupId])
+}
+
+model GroupModerator {
+  id        String   @id @default(cuid())
+  groupId   String
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@unique([groupId, userId])
+  @@index([groupId])
+}
+
+enum GroupRole {
+  OWNER
+  ADMIN
+  MODERATOR
+  MEMBER
+}
+
+model Analytics {
+  id              String    @id @default(cuid())
+  date            DateTime  @default(now())
+  dau             Int       @default(0)
+  mau             Int       @default(0)
+  newUsers        Int       @default(0)
+  topicsCreated   Int       @default(0)
+  postsCreated    Int       @default(0)
+  pageViews       Int       @default(0)
+
+  @@index([date])
+}
+
+// ============ 投票系统 (Polls) ============
+model Poll {
+  id            String        @id @default(cuid())
+  topicId       String        @unique
+  topic         Topic         @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  question      String
+  options       PollOption[]
+  totalVotes    Int           @default(0)
+  isActive      Boolean       @default(true)
+  allowMultiple Boolean       @default(false)
+  maxChoices    Int           @default(1)
+  showResults   PollVisibility @default(AFTER_VOTE)
+  endsAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([topicId])
+}
+
+model PollOption {
+  id        String       @id @default(cuid())
+  pollId    String
+  poll      Poll         @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  text      String
+  votes     PollVote[]
+  voteCount Int          @default(0)
+  order     Int          @default(0)
+  createdAt DateTime     @default(now())
+
+  @@index([pollId])
+}
+
+model PollVote {
+  id          String     @id @default(cuid())
+  pollId      String
+  poll        Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  optionId    String
+  option      PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  userId      String
+  createdAt   DateTime   @default(now())
+
+  @@unique([pollId, userId])
+  @@index([pollId])
+  @@index([userId])
+}
+
+enum PollVisibility {
+  ALWAYS
+  AFTER_VOTE
+  AFTER_END
+  NEVER
+}
+
+// ============ 收藏夹/书签 (Bookmarks) ============
+model Bookmark {
+  id        String   @id @default(cuid())
+  userId    String
+  topicId   String
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, topicId])
+  @@index([userId])
+  @@index([topicId])
+}
+
+// ============ 草稿系统 (Drafts) ============
+model Draft {
+  id        String   @id @default(cuid())
+  userId    String
+  type      DraftType
+  title     String?
+  content   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, type])
+}
+
+enum DraftType {
+  TOPIC
+  REPLY
+  BLOG_POST
+  MESSAGE
+}
+
+// ============ 用户关注系统 (Following) ============
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+// ============ 私信系统 (Direct Messages) ============
+model Conversation {
+  id          String          @id @default(cuid())
+  participants ConversationParticipant[]
+  messages    DirectMessage[]
+  lastMessageAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([lastMessageAt])
+}
+
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  lastReadAt     DateTime?
+  createdAt      DateTime    @default(now())
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model DirectMessage {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  content        String
+  isRead         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([conversationId])
+  @@index([senderId])
+}
+
+// ============ 内容版本历史 (Content History) ============
+model ContentHistory {
+  id        String   @id @default(cuid())
+  topicId   String?
+  postId    String?
+  userId    String
+  title     String?
+  content   String
+  diff      Json?
+  createdAt DateTime @default(now())
+
+  @@index([topicId])
+  @@index([postId])
+  @@index([userId])
+}
+
+// ============ 声望规则 (Reputation Rules) ============
+model ReputationRule {
+  id          String   @id @default(cuid())
+  action      String   @unique
+  points      Int
+  description String?
+  dailyLimit  Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============ 徽章规则 (Badge Rules) ============
+model BadgeRule {
+  id          String   @id @default(cuid())
+  badgeId     String
+  badge       Badge    @relation(fields: [badgeId], references: [id])
+  criteria    String   // JSON criteria
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@index([badgeId])
+}
+
+// ============ 聊天群组 (Chat Rooms) ============
+model ChatRoom {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  isPrivate   Boolean      @default(false)
+  members     ChatRoomMember[]
+  messages    ChatMessage[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([isPrivate])
+}
+
+model ChatRoomMember {
+  id        String    @id @default(cuid())
+  roomId    String
+  room      ChatRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId    String
+  role      ChatRole  @default(MEMBER)
+  joinedAt  DateTime  @default(now())
+
+  @@unique([roomId, userId])
+  @@index([userId])
+}
+
+model ChatMessage {
+  id        String     @id @default(cuid())
+  roomId    String
+  room      ChatRoom   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  senderId  String
+  content   String
+  createdAt DateTime   @default(now())
+
+  @@index([roomId])
+  @@index([senderId])
+}
+
+enum ChatRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+// ============ 搜索保存 (Saved Searches) ============
+model SavedSearch {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  query     String
+  filters   Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ============ 邮件订阅 (Email Subscriptions) ============
+model EmailSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  type      SubscriptionType
+  frequency String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, type])
+  @@index([userId])
+}
+
+enum SubscriptionType {
+  NEW_TOPICS
+  NEW_REPLIES
+  MENTIONS
+  DM
+  NEWSLETTER
+  DIGEST
+}
+
+// ============ 广告位 (Ad Placements) ============
+model AdPlacement {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  position    String
+  size        String?
+  code        String?
+  isActive    Boolean  @default(true)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AdImpression {
+  id          String   @id @default(cuid())
+  placementId String
+  userId      String?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([placementId])
+  @@index([createdAt])
+}
+
+// ============ 多语言资源 (i18n Resources) ============
+model Translation {
+  id        String   @id @default(cuid())
+  locale    String
+  key       String
+  value     String
+  group     String   @default("default")
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([locale, group, key])
+  @@index([locale])
+  @@index([group])
+}
+
+// ============ 系统设置 (System Settings) ============
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  type      SettingType @default(STRING)
+  group     String   @default("general")
+  isPublic  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([group])
+  @@index([key])
+}
+
+enum SettingType {
+  STRING
+  NUMBER
+  BOOLEAN
+  JSON
+}
+
+// ============ 站点地图 (Sitemap) ============
+model SitemapEntry {
+  id        String   @id @default(cuid())
+  url       String   @unique
+  type      String
+  lastmod   DateTime?
+  changefreq String?
+  priority  Float?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+  @@index([updatedAt])
+}
+
+// ============ 反应/表情系统 (Reactions) ============
+model Reaction {
+  id          String   @id @default(cuid())
+  userId      String
+  targetType  String   // 'topic' | 'post'
+  targetId    String
+  reactionType String  // 'like' | 'love' | 'laugh' | 'wow' | 'sad' | 'angry'
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, targetType, targetId])
+  @@index([userId])
+  @@index([targetType, targetId])
+}
+
+// ============ 附件系统 (Attachments) ============
+model Attachment {
+  id               String   @id @default(cuid())
+  filename         String
+  storedFilename   String
+  mimeType         String
+  size             Int
+  thumbnailFilename String?
+  userId           String
+  topicId         String?
+  postId          String?
+  messageId       String?
+  createdAt        DateTime @default(now())
+
+  @@index([userId])
+  @@index([topicId])
+  @@index([postId])
+}
+
+// ============ 用户动态 (Activity) ============
+model Activity {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  type        String   // 'TOPIC_CREATED' | 'REPLY_CREATED' | 'FOLLOWED_USER' | 'BADGE_EARNED' | etc.
+  targetType  String?  // 'topic' | 'user' | 'badge' | 'group'
+  targetId    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([targetType, targetId])
+}
+
+// ============ 通知系统 (Notifications) ============
+model Notification {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  type        String
+  title       String
+  message     String
+  isRead      Boolean   @default(false)
+  data        Json?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+// ============ 角色权限关联 (Role Permissions) ============
+model RolePermission {
+  id          String @id @default(cuid())
+  roleId      String
+  role        Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission  String
+
+  @@unique([roleId, permission])
+  @@index([roleId])
+}
