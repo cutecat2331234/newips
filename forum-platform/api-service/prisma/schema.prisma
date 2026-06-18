@@ -427,3 +427,336 @@ model Analytics {
 
   @@index([date])
 }
+
+// ============ 投票系统 (Polls) ============
+model Poll {
+  id            String        @id @default(cuid())
+  topicId       String        @unique
+  topic         Topic         @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  question      String
+  options       PollOption[]
+  totalVotes    Int           @default(0)
+  isActive      Boolean       @default(true)
+  allowMultiple Boolean       @default(false)
+  maxChoices    Int           @default(1)
+  showResults   PollVisibility @default(AFTER_VOTE)
+  endsAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([topicId])
+}
+
+model PollOption {
+  id        String       @id @default(cuid())
+  pollId    String
+  poll      Poll         @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  text      String
+  votes     PollVote[]
+  voteCount Int          @default(0)
+  order     Int          @default(0)
+  createdAt DateTime     @default(now())
+
+  @@index([pollId])
+}
+
+model PollVote {
+  id          String     @id @default(cuid())
+  pollId      String
+  poll        Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  optionId    String
+  option      PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  userId      String
+  createdAt   DateTime   @default(now())
+
+  @@unique([pollId, userId])
+  @@index([pollId])
+  @@index([userId])
+}
+
+enum PollVisibility {
+  ALWAYS
+  AFTER_VOTE
+  AFTER_END
+  NEVER
+}
+
+// ============ 收藏夹/书签 (Bookmarks) ============
+model Bookmark {
+  id        String   @id @default(cuid())
+  userId    String
+  topicId   String
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, topicId])
+  @@index([userId])
+  @@index([topicId])
+}
+
+// ============ 草稿系统 (Drafts) ============
+model Draft {
+  id        String   @id @default(cuid())
+  userId    String
+  type      DraftType
+  title     String?
+  content   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, type])
+}
+
+enum DraftType {
+  TOPIC
+  REPLY
+  BLOG_POST
+  MESSAGE
+}
+
+// ============ 用户关注系统 (Following) ============
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+// ============ 私信系统 (Direct Messages) ============
+model Conversation {
+  id          String          @id @default(cuid())
+  participants ConversationParticipant[]
+  messages    DirectMessage[]
+  lastMessageAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([lastMessageAt])
+}
+
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  lastReadAt     DateTime?
+  createdAt      DateTime    @default(now())
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model DirectMessage {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  content        String
+  isRead         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([conversationId])
+  @@index([senderId])
+}
+
+// ============ 内容版本历史 (Content History) ============
+model ContentHistory {
+  id        String   @id @default(cuid())
+  topicId   String?
+  postId    String?
+  userId    String
+  title     String?
+  content   String
+  diff      Json?
+  createdAt DateTime @default(now())
+
+  @@index([topicId])
+  @@index([postId])
+  @@index([userId])
+}
+
+// ============ 声望规则 (Reputation Rules) ============
+model ReputationRule {
+  id          String   @id @default(cuid())
+  action      String   @unique
+  points      Int
+  description String?
+  dailyLimit  Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============ 徽章规则 (Badge Rules) ============
+model BadgeRule {
+  id          String   @id @default(cuid())
+  badgeId     String
+  badge       Badge    @relation(fields: [badgeId], references: [id])
+  criteria    String   // JSON criteria
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@index([badgeId])
+}
+
+// ============ 聊天群组 (Chat Rooms) ============
+model ChatRoom {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  isPrivate   Boolean      @default(false)
+  members     ChatRoomMember[]
+  messages    ChatMessage[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([isPrivate])
+}
+
+model ChatRoomMember {
+  id        String    @id @default(cuid())
+  roomId    String
+  room      ChatRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId    String
+  role      ChatRole  @default(MEMBER)
+  joinedAt  DateTime  @default(now())
+
+  @@unique([roomId, userId])
+  @@index([userId])
+}
+
+model ChatMessage {
+  id        String     @id @default(cuid())
+  roomId    String
+  room      ChatRoom   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  senderId  String
+  content   String
+  createdAt DateTime   @default(now())
+
+  @@index([roomId])
+  @@index([senderId])
+}
+
+enum ChatRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+// ============ 搜索保存 (Saved Searches) ============
+model SavedSearch {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  query     String
+  filters   Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ============ 邮件订阅 (Email Subscriptions) ============
+model EmailSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  type      SubscriptionType
+  frequency String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, type])
+  @@index([userId])
+}
+
+enum SubscriptionType {
+  NEW_TOPICS
+  NEW_REPLIES
+  MENTIONS
+  DM
+  NEWSLETTER
+  DIGEST
+}
+
+// ============ 广告位 (Ad Placements) ============
+model AdPlacement {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  position    String
+  size        String?
+  code        String?
+  isActive    Boolean  @default(true)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AdImpression {
+  id          String   @id @default(cuid())
+  placementId String
+  userId      String?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([placementId])
+  @@index([createdAt])
+}
+
+// ============ 多语言资源 (i18n Resources) ============
+model Translation {
+  id        String   @id @default(cuid())
+  locale    String
+  key       String
+  value     String
+  group     String   @default("default")
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([locale, group, key])
+  @@index([locale])
+  @@index([group])
+}
+
+// ============ 系统设置 (System Settings) ============
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  type      SettingType @default(STRING)
+  group     String   @default("general")
+  isPublic  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([group])
+  @@index([key])
+}
+
+enum SettingType {
+  STRING
+  NUMBER
+  BOOLEAN
+  JSON
+}
+
+// ============ 站点地图 (Sitemap) ============
+model SitemapEntry {
+  id        String   @id @default(cuid())
+  url       String   @unique
+  type      String
+  lastmod   DateTime?
+  changefreq String?
+  priority  Float?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+  @@index([updatedAt])
+}
